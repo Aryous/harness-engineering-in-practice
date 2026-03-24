@@ -1,0 +1,8 @@
+# Reference articles (local only, not for public repo)
+references/
+
+# Plan document (internal)
+PLAN.md
+
+# macOS
+.DS_Store
