@@ -1,91 +1,192 @@
-# Harness Engineering 实践指南
+# 一个非工程师的 Harness Engineering 实践
 
-你的 AI 编程代理又犯了同样的错误。
+## 关于我
 
-你改了 prompt，好了一次，下次又坏了。你加了更多指令，它开始忽略其中一半。你换了更强的模型，旧问题消失了，新问题冒出来了。
+我不是软件工程师。
 
-这不是模型的问题。这是环境的问题。
+我的背景是数据运营——做过 SQE、主数据管理、数据分析。我没有系统学过软件工程，不懂设计模式，不会写测试框架。我使用 AI 编程工具（主要是 Claude Code）的方式，就是大多数人说的 vibe coding——描述我想要什么，让 agent 去写，出了问题就再描述一遍。
 
-[Mitchell Hashimoto](https://mitchellh.com/writing/my-ai-adoption-journey#step-5-engineer-the-harness) 把这个过程叫做 **Harness Engineering**（驾驭工程）：
+这篇文章不是教程。我没有资格写教程。
 
-> Anytime you find an agent makes a mistake, you take the time to engineer a solution such that the agent never makes that mistake again.
+这是一篇**实践笔记**。我读了 OpenAI 关于 [Harness Engineering](https://openai.com/index/harness-engineering/) 的文章，觉得里面的想法对我有用。然后我试着照做了。过程中我大量使用了现成的 Skill、脚本和工具——很多不是我写的，是 Claude 帮我写的，或者是社区现有的。我尽我所能给 agent 搭脚手架，最终做出了一些之前我自己做不到的东西。
 
-这篇教程不是文献综述。下面的每个组件、每段代码，都来自我围绕 Claude Code 构建的真实工具链——一个 AI 配图生成系统的 harness。它们不是一次性设计出来的，而是在 agent 反复犯错的过程中，一个一个被逼出来的。
+我想诚实地分享这个过程：我理解了什么，做了什么，哪里做得还不够。
 
 ---
 
-## 第一章：什么是 Harness Engineering
+## 我从 OpenAI 的文章中读到了什么
 
-### 起源
+OpenAI 在 2026 年初发表了一篇内部实验报告：[3 名工程师，5 个月，零手写代码，产出超过 100 万行生产级代码](https://openai.com/index/harness-engineering/)。
 
-2026 年初，OpenAI 发表了一篇内部实验报告：[3 名工程师，5 个月，零手写代码，产出超过 100 万行生产级代码](https://openai.com/index/harness-engineering/)。工程师的工作不是写代码，而是维护文档、定义意图、构建验证机制。Codex agent 负责执行。
+对我冲击最大的不是数字，是这句话：
 
-Mitchell Hashimoto 在同一时期独立提出了相同的方法论。他的表述更直接：**agent 犯了错，就修环境，让它不再犯**。不是修 prompt，不是换模型，是修环境。
+> **人类掌舵。智能体执行。**
 
-HumanLayer 在[数十个企业项目](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents)后得出同样的结论：
+以及他们对工程师角色的重新定义：
 
-> It's not a model problem. It's a **configuration problem**.
+> 工程师工作的重点转向了系统、架构和杠杆作用。
 
-### 三层框架
+他们发现，早期进展慢不是因为 Codex 不够强，而是因为**环境的规范不够明确**。agent 缺乏完成任务所需的工具、文档和结构。所以工程师的工作变成了：给 agent 创造能做好工作的环境。
+
+[Mitchell Hashimoto](https://mitchellh.com/writing/my-ai-adoption-journey#step-5-engineer-the-harness) 把这个方法论叫 Harness Engineering：
+
+> 每当 agent 犯错，就花时间设计一个解决方案，让它永远不再犯同样的错误。
 
 [Birgitta Böckeler](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html) 在 Martin Fowler 的网站上将 harness 拆解为三层：
 
 | 层 | 做什么 | 例子 |
 |---|---|---|
-| **Context Engineering** | 给 agent 提供正确的上下文 | AGENTS.md、知识库、动态可观测性数据 |
+| **Context Engineering** | 给 agent 提供正确的上下文 | AGENTS.md、知识库、可观测性数据 |
 | **Architectural Constraints** | 用确定性规则约束 agent 行为 | Linter、结构测试、参数契约 |
-| **Garbage Collection** | 周期性清理熵增 | 文档漂移扫描、索引重建、工作目录清理 |
+| **Garbage Collection** | 周期性清理熵增 | 文档漂移扫描、索引重建、目录清理 |
 
-### 核心原则
+读到这里，我意识到一件事：**我一直在做的 vibe coding，缺的不是更强的模型，是环境。** 我每次都在重新告诉 agent 同样的规则，每次它都以新的方式犯同样的错。因为我没有把规则固化到环境里。
 
-Harness Engineering 是**反应式**的。不是提前设计完美系统，而是：
+### OpenAI 文章中对我影响最大的三点
 
-```
-agent 犯错 → 诊断根因 → 修改环境 → 永不重犯
-```
+**1. 给地图，不是给手册**
 
-你今天的 harness 可能只有一个 CLAUDE.md。这完全没问题。它会在 agent 犯错的过程中自然生长。
+他们试过"一个巨大的 AGENTS.md"，失败了。原因很直觉：当一切都"重要"时，一切都不重要。agent 的注意力是有限的，塞太多指令反而更差。
+
+他们的解法：AGENTS.md 只有约 100 行，是一张**目录**，指向 `docs/` 下的深层文档。agent 需要什么就去查什么。这叫**渐进式披露**。
+
+**2. 不是模型的问题，是配置的问题**
+
+[HumanLayer](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents) 在几十个企业项目后得出了同样的结论：
+
+> It's not a model problem. It's a **configuration problem**.
+
+这句话改变了我遇到问题时的第一反应。以前是"模型不够聪明"或者"我描述得不够好"，现在是"**环境里缺了什么？**"
+
+**3. 代码仓库是唯一的真相来源**
+
+> 从智能体的角度来看，它在运行时无法在情境中访问的任何内容都是不存在的。存储在 Google Docs、聊天记录或人们头脑中的知识都无法被系统访问。
+
+这意味着：如果我希望 agent 遵守某个规则，这个规则必须写在它能看到的地方——代码仓库里的文件。不能只在对话里说一次。
 
 ---
 
-## 第二章：Harness 的六个组件
+## 我的实践：从零构建一个简历编辑器
 
-以下六个组件来自 [HumanLayer 的实战总结](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents)。每个组件我都用自己的真实工件来说明——它们都在 [`examples/`](./examples/) 目录下，可以直接查看完整代码。
+### 为什么选这个项目
 
-### 1. CLAUDE.md / AGENTS.md — 仓库级指令
+我需要一份好的简历。我之前用 Typst（一种排版语言）手写简历模板，但每次修改内容都要手动编辑源码、重新编译、检查排版。我想要一个左边表单、右边实时预览的编辑器，能自动编译 Typst 并导出 PDF。
 
-**问题**：每次新对话，agent 都忘了项目的基本规则。哪些文件在哪里，用什么命令，什么不能碰。每次都要重新说一遍。
+这个项目在以前我是做不出来的。它需要：Next.js 前端、API routes、Typst 编译集成、实时预览、数据持久化。任何一项我都不会。
 
-**解法**：写一个 CLAUDE.md，让 harness 在每次对话开始时自动注入 agent 的系统提示。
+通过 vibe coding 我能让 agent 写出能跑的代码，但质量不稳定——它会忘记之前的设计决策，重复引入已修复的 bug，风格不一致。所以我决定试试 Harness Engineering 的方法。
 
-**代码**：[`examples/CLAUDE.md`](./examples/CLAUDE.md)
+### 第一步：写 CLAUDE.md
+
+OpenAI 的文章说"给地图，不是给手册"。所以我的 CLAUDE.md 不长，大约 100 行，分成几个明确的 section：
 
 ```markdown
-## Context Loading
+## 开发命令
 
-Claude loads relevant background on demand based on conversation content.
-It does NOT load everything at the start.
+cd web
+npm run dev      # 启动开发服务器 (localhost:3000)
+npm run build    # 生产构建
+npm run lint     # ESLint 检查
 
-### Memory
+## 项目架构
 
-@~/.claude/memories/INDEX.md
-@~/.claude/memories/PROFILE.md
+这是一个本地简历编辑器，
+左侧表单 → 实时生成 Typst 源码 → 调用本地 typst 编译 → 右侧预览 SVG。
 
-- When a topic relates to a memory entry, check INDEX first,
-  then Read the specific file
+### 目录结构
+
+typst/               # Typst 模板与数据层
+  template.typ       # 布局与样式定义
+  resume.json        # 简历数据（gitignored）
+  resume.example.json # 示例数据
+
+web/                 # Next.js 16 前端
+  src/
+    types/resume.ts        # 核心类型定义
+    lib/generateTypst.ts   # ResumeData → .typ 源码
+    app/api/compile/       # POST: 生成 SVG 预览
+    app/api/export/        # POST: 导出 PDF
+    components/
+      ResumeEditor.tsx     # 主组件
+      FormEditor.tsx       # 左栏表单
+      Preview.tsx          # 右栏 SVG 预览
 ```
 
-关键设计决策：**按需加载，不是全量注入**。ETH Zurich 的[研究](https://arxiv.org/abs/2602.11988)证实了这一点——往 agent 系统提示里塞太多内容，反而让它变蠢。目录结构、文件列表这些 agent 自己就能发现的东西，不要写进去。只写它无法自行推断的规则。
+这里的每一行都是 agent 犯过错之后加的：
 
-**教训**：CLAUDE.md 的价值不在于全面，在于精准。我们的 CLAUDE.md 不到 50 行。
+- **开发命令**：agent 不知道要 `cd web` 才能跑项目，在根目录执行 `npm run dev` 然后报错
+- **编译流程**：agent 不理解 Typst 源码怎么变成 SVG，写 API 时路径全搞错了
+- **目录结构**：agent 不知道 `template.typ` 在哪里，每次都在错误的位置创建新文件
 
-### 2. Skills — 渐进式披露
+这就是 Mitchell Hashimoto 说的反应式方法：**agent 犯了错 → 写进 CLAUDE.md → 永不重犯。**
 
-**问题**：把所有指令塞进 CLAUDE.md，agent 的上下文窗口很快就满了。指令越多，每条指令被遵守的概率越低。
+### 第二步：自主工作流规则
 
-**解法**：把领域专用知识封装成 Skill，agent 需要时才加载。这就是 HumanLayer 说的 **progressive disclosure**——渐进式披露。
+只有"是什么"（项目结构）还不够，还需要"怎么做"（工作流程）。agent 反复出现的问题是：
 
-**代码**：[`examples/skills/memv2/SKILL.md`](./examples/skills/memv2/SKILL.md)
+- 改完代码不 lint，提交了才发现有错
+- 改完不看效果，继续往下写，错误层层叠加
+- 不知道什么时候该停下来
+
+所以我在 CLAUDE.md 里加了自主工作流规则：
+
+```markdown
+## 自主工作流规则
+
+### 完成一项工作后立即 commit
+
+每次完成一个功能点、修复、或设计改动后，自动执行：
+
+cd web && npm run lint      # 必须 lint 通过
+git add -A
+git commit -m "..."
+
+lint 有报错时先修复，再 commit。
+
+### 自主测试
+
+- 每次改动组件后，确认 dev server 正在运行
+- 用 Playwright 截图验证页面可正常加载、无明显布局崩溃
+- 如果截图显示异常，优先修复，再继续
+
+### 停止条件
+
+以下情况停止，等待用户反馈：
+- 遇到需要用户决策的设计方向分歧
+- 某个问题修复超过 2 次仍未解决
+```
+
+对照 Harness Engineering 的框架：
+
+| 规则 | 对应的 Harness 维度 |
+|---|---|
+| lint → commit 流程 | **Architectural Constraints**：确定性校验 |
+| Playwright 截图自检 | **Back-Pressure**：agent 验证自己的工作 |
+| 停止条件 | **Architectural Constraints**：明确的边界 |
+
+这些规则加进去之后，agent 的行为立刻变得更可预测。它不再是"想到哪写到哪"，而是有节奏的：改动 → 检查 → 提交 → 下一个。
+
+### 结果
+
+14 个 commit 后，我有了一个能用的简历编辑器：左栏表单编辑个人信息和工作经历，右栏实时渲染 Typst 并预览 SVG，一键导出 PDF。经历了暗色极简风 → Figma 风格重构 → 浅色系重设计三次 UI 迭代。
+
+这是之前 vibe coding 做不到的。不是模型变强了——从头到尾用的都是同一个模型。是**环境变了**。agent 有了地图（CLAUDE.md）、有了规则（lint 流程）、有了自检能力（Playwright 截图）、有了边界（停止条件）。
+
+---
+
+## 进阶：当单文件不够用
+
+Typst 简历编辑器的 harness 只有一个 CLAUDE.md。对简单项目来说够了。但当系统变复杂，一个文件装不下所有知识。
+
+我在另一个项目——AI 配图生成系统 [LayerAxis](https://github.com/Aryous)——上遇到了这个问题。它是一个三级流水线（orchestrator → creative agent → render agent），为文章的每个章节设计和生成配图。这个系统的 harness 需要更多组件。
+
+以下工件都在 [`examples/`](./examples/) 目录下，是真实使用中的代码，做了脱敏处理。
+
+### Skills — 渐进式披露
+
+CLAUDE.md 越写越长时，agent 的上下文窗口开始不够用。[HumanLayer 称之为 progressive disclosure](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents)：把领域知识封装成 Skill，需要时才加载。
+
+[`examples/skills/memv2/SKILL.md`](./examples/skills/memv2/SKILL.md) 是一个知识持久化的 Skill：
 
 ```markdown
 ---
@@ -93,15 +194,9 @@ name: memv2
 description: >
   Classify, structure, and persist conversation knowledge.
   Explicit trigger: user says /mem.
-  Implicit trigger: when conversation produces reusable methodology...
 ---
 
 # Knowledge Persistence Spec
-
-## Philosophy
-
-Records exist not to "miss nothing," but to
-**let your future self reactivate the thinking state of the present moment**.
 
 ## Record Types
 
@@ -109,276 +204,121 @@ Records exist not to "miss nothing," but to
 | --- | --- | --- |
 | Snapshot | Preferences, inspiration | references/snapshot.md |
 | Archive | Structured output, methodology | references/archive.md |
-| ...
 ```
 
-Skill 的 `description` 字段告诉 harness 什么时候该加载它。用户说 `/mem` 时触发，或者对话中产生了方法论性质的内容时隐式触发。Skill 没被触发时，它不占上下文空间。
+`description` 字段告诉 harness 什么时候加载这个 Skill。没被触发时，不占上下文空间。
 
-Skill 目录本身就是一个渐进式披露结构：主 SKILL.md 告诉 agent 有哪些 reference 文件，agent 按需读取。不是一次性塞进去。
+### Architectural Constraints — 参数契约
 
-**教训**：如果你发现 CLAUDE.md 越写越长，说明你需要把领域知识拆成 Skill。
+多 agent 系统的问题是：downstream agent 会偷偷覆写 upstream 的决定。creative agent 觉得 4:3 比 16:9 好看，就自己改了 orchestrator 设定的参数。
 
-### 3. Scripts / Tools — 确定性工具
-
-**问题**：配图生成完成后，需要把 `imgs-spec/` 下的文件归档到正确目录、加正确前缀、插入正确的文章引用、最后清空工作目录。让 agent 手动做这些步骤，每次都会出错——忘记加前缀、归档到错误路径、清理不干净。
-
-**解法**：写一个 shell 脚本，agent 调用一次就全部搞定。
-
-**代码**：[`examples/skills/illustration-archive/scripts/archive.sh`](./examples/skills/illustration-archive/scripts/archive.sh)
-
-```bash
-#!/usr/bin/env bash
-# Archive imgs-spec/ to Resource/illustrations/<project>/
-set -e
-
-FILENAME=$(basename "$ARTICLE_PATH" .md)
-DATE_RAW=$(echo "$FILENAME" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}')
-DATE=$(echo "$DATE_RAW" | tr -d '-')
-PROJECT=$(echo "$FILENAME" | sed "s/^${DATE_RAW}-//")
-PREFIX="${DATE}-${PROJECT}"
-
-# Archive images with prefix
-for f in "$IMGS_SPEC"/*.jpg; do
-  [[ -e "$f" ]] || continue
-  cp "$f" "$RESOURCE_BASE/$PROJECT/images/${PREFIX}-$(basename "$f")"
-done
-
-# Clean imgs-spec/ only after successful archive
-rm -f "$IMGS_SPEC"/*.jpg "$IMGS_SPEC"/*.md "$IMGS_SPEC"/*.yaml
-```
-
-注意 `set -e`：任何一步失败，脚本立刻停止。不是 agent 去判断"要不要继续"，是确定性地失败。
-
-Mitchell Hashimoto 把这类工具分为两类：
-1. **隐式提示**（AGENTS.md）——告诉 agent 用什么命令、避免什么行为
-2. **实际工具**（脚本）——把多步操作封装成一次调用
-
-两者通常配合使用：SKILL.md 里写 `bash archive.sh "<path>"`，agent 照做就行。
-
-**教训**：能用脚本确定性完成的事，不要让 agent 自由发挥。
-
-### 4. Architectural Constraints — 参数契约
-
-**问题**：配图系统是一个三级流水线——orchestrator 设定参数，creative agent 设计构图，render agent 出图。问题是：downstream agent 会偷偷覆写 upstream 设定的参数。creative agent 觉得 4:3 比 16:9 更好看，就自己改了。
-
-**解法**：用 `plan.lock.yaml` 锁定参数，配合 `pipeline-gates.md` 在每个阶段入口校验。
-
-**代码**：[`examples/constraints/plan-lock.yaml`](./examples/constraints/plan-lock.yaml)
+解法是 [`examples/constraints/plan-lock.yaml`](./examples/constraints/plan-lock.yaml)——锁定参数，只有 orchestrator 能写，所有 downstream agent 只读：
 
 ```yaml
-# plan.lock.yaml — Global parameter contract (orchestrator-owned)
-# Only the orchestrator can write this file. All downstream agents read-only.
-
-density: standard          # minimal | standard | full
-style_guide: digital-rationalism
+# plan.lock.yaml — Only the orchestrator can write. Downstream read-only.
+density: standard
 generation:
   model: gemini-3-pro-image-preview
-  aspect_ratio: "16:9"     # 1:1 | 3:4 | 4:3 | 9:16 | 16:9
-  image_size: "2K"         # 1K | 2K | 4K
+  aspect_ratio: "16:9"
+  image_size: "2K"
 ```
 
-**代码**：[`examples/constraints/pipeline-gates.md`](./examples/constraints/pipeline-gates.md)
+配合 [`examples/constraints/pipeline-gates.md`](./examples/constraints/pipeline-gates.md)——每个阶段入口的校验清单：
 
 ```markdown
 ## Gate 0 — Before creative phase
-
 - plan.lock.yaml exists
 - Only contains approved keys (whitelist)
-- Value domains are valid:
-  - density: minimal / standard / full
-  - aspect_ratio: 1:1 / 3:4 / 4:3 / 9:16 / 16:9
-  - image_size: 1K / 2K / 4K
+- Value domains are valid
 
 ## Gate B — Before render phase
-
-- plan.lock.yaml contains no unknown fields
 - At least one NN-*.md exists
 - Each NN-*.md has non-empty ## English Prompt
 ```
 
-Gate 的设计原则：**成功静默，失败出声**。通过了就继续，不通过就停下来报错。不要在成功时输出一大段确认信息——那些文字会塞满 agent 的上下文窗口，让它变蠢。HumanLayer 称之为 **context-efficient back-pressure**。
+Gate 的原则是 **成功静默，失败出声**——验证通过不输出任何东西，只有失败时才注入 agent 上下文。这个原则来自 HumanLayer 的教训：他们早期让 agent 每次跑完整测试套件，4000 行通过的测试输出涌入上下文，agent 反而开始幻觉。
 
-**教训**：agent 之间的信任不能靠 prompt 建立。用文件锁定契约，用 gate 校验合规。
+### Sub-Agents — 上下文防火墙
 
-### 5. Sub-Agents — 上下文防火墙
+一个 agent 同时处理创意设计和图片渲染时，中间过程（文件读取、API 日志、错误重试）会塞满上下文窗口。窗口越长，agent 越蠢——[Chroma 的研究](https://research.trychroma.com/context-rot)证实了这一点。
 
-**问题**：让一个 agent 同时处理创意设计和图片渲染，它的上下文窗口很快被中间过程塞满——文件读取结果、API 调用日志、错误重试记录。窗口越长，agent 越蠢。
-
-**解法**：拆成独立的 sub-agent，每个 sub-agent 有自己的上下文窗口。orchestrator 只看到 sub-agent 的最终输出，不被中间噪音污染。
-
-**代码**：[`examples/orchestrator/orchestrator.md`](./examples/orchestrator/orchestrator.md)
+拆成独立 sub-agent 后，orchestrator 只看到最终输出（[`examples/orchestrator/orchestrator.md`](./examples/orchestrator/orchestrator.md)）：
 
 ```markdown
-## Subagent Interaction Matrix
-
-|  | plan.lock | outline.md | NN-*.md | *.png | summary.json |
-|---|---|---|---|---|---|
-| **orchestrator** | Write | — | — | — | — |
-| **creative**     | Read  | Write | Write | — | — |
-| **render**       | Read  | —     | Read  | Write | Write |
+|              | plan.lock | outline.md | NN-*.md | *.png | summary.json |
+|--------------|-----------|------------|---------|-------|--------------|
+| orchestrator | Write     | —          | —       | —     | —            |
+| creative     | Read      | Write      | Write   | —     | —            |
+| render       | Read      | —          | Read    | Write | Write        |
 ```
 
-关键不是"角色分工"——不是"前端 agent"和"后端 agent"。HumanLayer 试过这种模式，[不好用](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents)。关键是**上下文隔离**。creative agent 的所有探索、试错、回溯，都封装在它自己的上下文里。orchestrator 只拿到最终的 outline.md 和 NN-*.md。
+### 一个迭代故事：33% → 100%
 
-Sub-agent 还有成本收益：orchestrator 用贵的 Opus 做规划，sub-agent 用便宜的 Sonnet 做执行。任务越简单、上下文越干净的窗口，越不需要强模型。
+这些组件不是一次性设计出来的。下面是配图系统的真实迭代数据：
 
-**教训**：如果你觉得需要更长的上下文窗口，你可能需要的是更好的上下文隔离。
-
-### 6. Back-Pressure — 自检验证
-
-**问题**：agent 说"完成了"，但输出有问题。缺少必需字段、格式不对、文件没写完。你不检查就直接用了，到下游才发现。
-
-**解法**：让 agent 在声称完成之前，先自己验证。验证通过才能继续，不通过就回退重做。
-
-这不需要单独的代码——它是 pipeline-gates 的另一面。Gate B 要求每个 `NN-*.md` 都有非空的 `## English Prompt`。如果 creative agent 偷懒跳过了某张图的提示词，Gate B 拦住它，要求补齐后重新过检。
-
-设计原则和 hooks 一样：**成功静默，失败出声**。验证通过时不要输出任何东西。只有失败时才把错误信息注入 agent 上下文，迫使它修复。HumanLayer 早期的做法是每次都跑完整测试套件——4000 行通过的测试结果涌入上下文，agent 反而开始幻觉。后来改成只暴露失败，问题消失了。
-
-**教训**：给 agent 验证自己工作的能力，是投入产出比最高的 harness 改进。
-
----
-
-## 第三章：一个真实的迭代故事
-
-理论容易讲，但 harness 的价值必须用数据说话。下面是我的配图系统从 33% 通过率到 100% 的完整迭代过程。每一步提升，都对应一个具体的 harness 修改。
-
-### 背景
-
-我围绕 Claude Code 构建了一个 AI 配图生成系统（[LayerAxis](https://github.com/Aryous)）。它读取一篇文章，为每个章节设计配图的视觉隐喻、色彩方案和构图，输出英文提示词，再调用图像生成 API 出图。
-
-系统架构：orchestrator → creative agent → render agent。creative agent 是核心——它要读懂文章、选隐喻、展开为视觉场景、写出精确的设计规格。
-
-### 迭代数据
-
-| 日期 | 干预 | 通过率 | 对应 Harness 维度 |
+| 日期 | 干预 | 通过率 | Harness 维度 |
 |---|---|---|---|
-| 02-16 | 隐喻展开三步法 + 提示词规格化 | 33%（2/6） | Context Engineering |
-| 02-17a | dimension-catalog 引用内联 + "退后一步看"认知锚点 | 71%（5/7） | Context Engineering |
-| 02-17b | 一句话执行流约束 | 100%（6/6） | Architectural Constraints |
-
-### 第一次：33%（2/6）—— 隐喻选了但没展开
-
-6 张配图跑完，只有 2 张能用。把生成的提示词和之前手工流程产出的高质量提示词对比，发现系统性差距：
-
-**问题**：SKILL.md 的流程是"选隐喻类型 → 直接写提示词"，中间跳过了把抽象隐喻展开为具体视觉规格的步骤。"坐标系"只是一个类型标签，不是施工图纸。
-
-**Harness 修复**：在 SKILL.md 中增加隐喻展开三步——选类型、定规格（物件形态/尺寸/位置/标注/空间关系）、验可读。同时把提示词的写法从"叙述式"改为"规格式"——每个视觉元素写成组件规格（fill/border/radius），不写氛围描述。
-
-这是 **Context Engineering**：agent 不是不会做，是缺少做好的知识。补上就行。
-
-### 第二次：71%（5/7）—— 参考文件没加载
-
-通过率从 33% 升到 71%，但仍有 2 张失败。图 06 的网络图布局视觉动线混乱，图 07 的 3D 等距台阶让 AI 渲染成千层饼。
-
-**问题**：`dimension-catalog.md`（结构类型列表、隐喻表、情绪修辞表）藏在 ref 的 ref 里，SKILL.md 完全没有指向它。agent 不知道这个文件存在。另外，硬规则全是数量上限（≤7 元素、≤3 颜色），缺少引导 agent"感受"设计质量的锚点。
-
-**Harness 修复**：
-1. 在 SKILL.md 三个维度展开处各加 `@references/dimension-catalog.md` 引用
-2. 插入"退后一步看"认知锚点——不是清单，是三个引导性问题：
-   - "眼睛先落在哪里？然后往哪移动？"（视觉动线唯一性）
-   - "几样东西在争夺注意力？超过七个就砍"（信息密度控制）
-   - "3D 的深度方向在表达什么信息？说不出就换 2D"（维度适配）
-
-仍然是 **Context Engineering**：不是加规则，是用引导式提问让模型主动内化设计原则。
-
-### 第三次：100%（6/6）—— 一句话修复执行流
-
-6/6 全部通过，但质量只有 65-70 分——能用，但不出彩。图 04 之前的版本用双色反向梯度条直接"画出"核心洞察，这次只是四张卡片加底部文字，把洞察"说出来"而非"画出来"。
-
-**问题**：这看起来是创意不足，但实际是**执行流程**的问题。模型把 Step 2/3/4 理解为横向批处理——先写完所有 6 张图的场景设计，再回头逐个追加上色和提示词。这导致写提示词时，场景设计已经是几分钟前的内容，注意力从"构建视觉世界"变成"机械翻译已有描述"。
-
-**Harness 修复**：在 SKILL.md Step 2 开头加一句话：
-
-> 对每张图，走完 Step 2→3→4 完整链路后再做下一张。
-
-一句话。不改步骤结构，不引入新编号。这是 **Architectural Constraint**——不是告诉 agent"创意要好"，而是约束执行顺序，让创意连贯性自然恢复。
-
-### 迭代的启示
-
-回看这三次迭代：
-
-1. **33% → 71%**：补知识（Context Engineering）
-2. **71% → 100%**：补引导（Context Engineering）
-3. **100% 但不出彩 → 100% 且出彩**：改执行流（Architectural Constraint）
+| 02-16 | 隐喻展开三步法 + 提示词从叙述改为规格书 | 33%（2/6） | Context Engineering |
+| 02-17a | 补上遗漏的参考文件引用 + 加设计原则引导问题 | 71%（5/7） | Context Engineering |
+| 02-17b | 加一句执行流约束：每张图走完全链路再做下一张 | 100%（6/6） | Architectural Constraints |
 
 没有一次是换模型解决的。每次都是问"环境里缺了什么"，然后补进去。
 
-第三次尤其值得注意：问题表现为"创意不足"，但根因是执行流程切断了注意力连贯性。如果不诊断根因直接加 prompt"请更有创意"，不会有任何效果。
-
-这就是 Mitchell Hashimoto 说的：**agent 犯了错，修环境，不是修 prompt。**
+第三次尤其有意思：问题表现为"创意不足"，但根因是执行流程把 Step 2/3/4 理解成了批处理——先写完所有场景设计，再回头补提示词。注意力断了。修复方法是加一句话约束执行顺序，创意连贯性自然恢复。
 
 ---
 
-## 第四章：如何开始建你自己的 Harness
+## 我还不会做的事
 
-### 从 CLAUDE.md 开始
+诚实地说，我的实践和 OpenAI 文章描述的还有很大差距：
 
-如果你还没有 CLAUDE.md（或 AGENTS.md），现在就建一个。它是最低成本的 harness 组件——一个 markdown 文件，zero infrastructure。
+- **我没有自定义 linter。** OpenAI 用自定义 linter 机械化执行架构约束（依赖方向、命名规范、文件大小限制）。我的约束全靠 CLAUDE.md 里的文字描述，依赖 agent 自觉遵守。
+- **我没有自动化 CI。** OpenAI 的每个 PR 都经过 agent 审查 + CI 校验。我的项目只有本地 lint。
+- **我的垃圾回收是手动的。** OpenAI 有后台 agent 定期扫描漂移、开重构 PR。我还在手动清理。
+- **我的可观测性为零。** OpenAI 给 Codex 接了完整的日志/指标/追踪栈。我的 agent 看不到运行时数据。
 
-不要试图提前设计完美的 CLAUDE.md。先写三件事：
-- 项目用什么语言/框架
-- 测试怎么跑
-- 什么文件不能碰
-
-然后开始用 agent 干活。
-
-### 反应式迭代
-
-Mitchell Hashimoto 的路径：
-
-```
-Step 1: Agent 犯了错
-Step 2: 诊断根因（不是表面症状）
-Step 3: 修改环境（CLAUDE.md / Skill / 脚本 / 约束）
-Step 4: 验证修复
-Step 5: 回到 Step 1
-```
-
-每次 agent 犯错，问自己两个问题：
-1. 这是第几次犯同类错误？
-2. 我能用什么确定性手段阻止它再犯？
-
-第一次犯 → 写进 CLAUDE.md。
-第二次同类错误 → 升级为 Skill 或 Hook。
-第三次 → 考虑 Architectural Constraint（linter、gate、脚本）。
-
-### 避免过度工程
-
-HumanLayer 的经验值得记住——他们试过的但**不好用**的：
-
-- 提前设计完美 harness（还没遇到真实失败就开始优化）
-- 安装几十个 MCP 服务器"以备不时之需"（工具太多反而让 agent 变蠢）
-- 每次都跑完整测试套件（成功的测试输出塞满上下文窗口）
-- 精细控制每个 sub-agent 能访问哪些工具（增加复杂度但没有改善结果）
-
-好用的：
-
-- **只在 agent 实际失败时才加配置**
-- 成功静默，失败出声
-- 优化迭代速度，不优化"一次成功概率"
-- 不好用的配置果断删掉
-
-Harness 不是越复杂越好。它应该是 agent 犯错历史的最小充分集。
+这些差距不是因为工具不存在，是因为我的工程能力还不够把它们搭起来。但方向是清晰的：**把更多的规则从文档变成代码，从依赖 agent 自觉变成机械化执行。**
 
 ---
 
-## 结尾
+## 写在最后
 
-Harness Engineering 改变了工程师的工作内容。
+回到开头的问题：一个非工程师能从 Harness Engineering 中得到什么？
 
-从前你是 maker——写代码，调 bug，优化性能。现在你越来越像 manager——你不直接写代码，你设计让 agent 写好代码的环境。你的产出不是代码行数，是约束、工具、文档和验证机制。
+对我来说，最大的收获是一个思维方式的转变。以前 agent 出了问题，我的反应是"这个模型不行"或者"我再试一次"。现在我的反应是：**环境里缺了什么？**
+
+这个问题让我从"试运气"变成了"建系统"。即使我建的系统很粗糙，它也比每次从零开始要好。
 
 Martin Fowler 在他的文章最后问了一个问题：
 
 > **What's your harness today?**
 
-你的回答不需要很复杂。一个 50 行的 CLAUDE.md、一个 pre-commit hook、一个跑测试的脚本——这就是 harness 的起点。
+我的 harness 今天是：一个 100 行的 CLAUDE.md、几个现成的 Skill、一些 shell 脚本、一套参数锁定文件。不多，但比上个月多。
 
-重要的不是你今天有多少组件，而是你是否建立了这个循环：
+如果你也在用 AI 编程工具，不管你的工程背景如何，我觉得 harness 的核心思想对每个人都适用：
 
-**agent 犯错 → 诊断根因 → 修环境 → 永不重犯。**
+**agent 犯了错 → 诊断根因 → 固化到环境里 → 下次不再犯。**
+
+不需要一次做对。只需要每次比上次好一点。
 
 ---
+
+## 代码
+
+本仓库的 [`examples/`](./examples/) 目录包含我在实践中使用的真实 harness 工件（已脱敏）：
+
+```
+examples/
+├── CLAUDE.md                     # 全局 agent 指令（渐进式上下文加载）
+├── skills/
+│   ├── memv2/                    # 知识持久化 Skill
+│   └── illustration-archive/     # 配图归档 Skill + 清理脚本
+├── constraints/
+│   ├── plan-lock.yaml            # 参数锁定契约
+│   └── pipeline-gates.md         # 阶段门禁校验
+└── orchestrator/
+    └── orchestrator.md           # 多 agent 权限矩阵
+```
 
 ## 参考文献
 
@@ -389,7 +329,6 @@ Martin Fowler 在他的文章最后问了一个问题：
 | 3 | [Skill Issue: Harness Engineering for Coding Agents](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents) | HumanLayer |
 | 4 | [My AI Adoption Journey](https://mitchellh.com/writing/my-ai-adoption-journey) | Mitchell Hashimoto |
 | 5 | [The Emerging Harness Engineering Playbook](https://www.ignorance.ai/p/the-emerging-harness-engineering) | Ignorance.ai |
-| 6 | [From Prompt Engineering to Harness Engineering](https://softmaxdata.com/blog/from-prompt-engineering-to-harness-engineering-the-three-eras-of-building-with-ai/) | Softmax |
 
 ## License
 
