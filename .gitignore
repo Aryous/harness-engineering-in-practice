@@ -1,8 +1,10 @@
-# Reference articles (local only, not for public repo)
-references/
-
-# Plan document (internal)
+# Internal / sensitive
+BRIEF.md
+CEO 面试会议纪要.md
 PLAN.md
+references/
+.claude/
+examples/
 
 # macOS
 .DS_Store
