@@ -158,6 +158,66 @@ LangChain 只优化运行环境，不改模型参数，Terminal Bench 2.0 排名
 
 Typst 项目的每一个失败模式都变成了墨简的一条设计约束。UI 直调 API → 六层分层 + ESLint 规则。Store 混合职责 → 层间依赖禁令。零测试 → 14 个结构测试 + CI 门禁。我的工作不是写这些约束的代码——Claude 写的——我的工作是决定需要哪些约束、放在哪一层、违反了会怎样。
 
+整个 Harness 的架构：
+
+```mermaid
+flowchart TB
+    subgraph Input["人类输入"]
+        intent["模糊意图 / 功能需求"]
+    end
+
+    subgraph Agents["五个专职 Agent"]
+        req["req-review<br/>结构化需求"]
+        tech["tech-selection<br/>技术决策"]
+        design["design<br/>设计规范 + 实现"]
+        feature["feature<br/>功能开发"]
+        doc["doc-gardening<br/>文档清理"]
+    end
+
+    subgraph Constraints["三层约束体系"]
+        hard["🔴 硬约束<br/>自定义 ESLint + 14 结构测试<br/>构建失败即阻断"]
+        medium["🟡 中约束<br/>.claude/rules/<br/>自动注入 Agent 上下文"]
+        soft["🟢 软约束<br/>docs/<br/>Agent 需主动读取"]
+    end
+
+    subgraph Architecture["六层架构 (ESLint 强制)"]
+        direction LR
+        types["Types"] --> config["Config"] --> repo["Repo"] --> service["Service"] --> runtime["Runtime"] --> ui["UI"]
+    end
+
+    subgraph Quality["质量闭环"]
+        score["QUALITY_SCORE<br/>需求覆盖 | 架构合规 | 文档新鲜度 | 测试覆盖"]
+        gate{"< 40 分?"}
+        block["🚫 阻断<br/>Agent 拒绝工作"]
+    end
+
+    subgraph Map["知识地图"]
+        claude["CLAUDE.md<br/>162 行目录"]
+        docs["docs/<br/>design-docs / exec-plans<br/>product-specs / references"]
+    end
+
+    intent --> req
+    req -->|requirements.md| tech
+    tech -->|tech-decisions.md| design
+    design -->|design-spec.md| feature
+    feature -->|src/ 代码 + 测试| score
+
+    score --> gate
+    gate -->|是| block
+    block -->|修复后重新提交| feature
+    gate -->|否| doc
+
+    claude -.->|按图索骥| docs
+    docs -.->|软约束| Agents
+    medium -.->|自动注入| Agents
+    hard -.->|构建时拦截| feature
+
+    soft -->|"违反 2 次 → 升级"| medium
+    medium -->|"仍违反 → 升级"| hard
+
+    Architecture -.->|依赖规则写入| hard
+```
+
 ### CLAUDE.md 是地图
 
 OpenAI 尝试过把所有规则塞进一个巨大的 `AGENTS.md`。失败了：
