@@ -276,25 +276,11 @@ requirements.trace.yaml      ← 结构化注册表（给脚本读）
 运行效果：
 
 ```
-═══════════════════════════════════════════════
-  溯源覆盖率报告
-  来源: requirements.trace.yaml (sidecar)
-  总计: 12 条
-  扫描: src/ + tests/
-  约定: @req <ID>
-═══════════════════════════════════════════════
-
-  ✅ R1.1 简历内容编辑
-     └─ src/service/resume-service.ts:42
-  ✅ R2.1 Typst 渲染
-     └─ src/service/compile-service.ts:15
-  ❌ F06 AI 冷启动生成
-  ❌ F07 description 格式化
-
-───────────────────────────────────────────────
-  覆盖: 10/12 (83%)
-  缺失: 2/12
-═══════════════════════════════════════════════
+✅ R1.1 简历内容编辑 → src/service/resume-service.ts:42
+✅ R2.1 Typst 渲染   → src/service/compile-service.ts:15
+❌ F06 AI 冷启动生成
+❌ F07 description 格式化
+覆盖: 10/12 (83%)
 ```
 
 `--strict` 模式下，有未覆盖的条目就 exit 1——提交被阻断。`--sync` 模式下，有代码覆盖的 `open` 状态自动回写为 `resolved`。
