@@ -54,9 +54,24 @@ Harness 是 Agent 的运行环境——CLAUDE.md、自定义 lint、结构测试
 
 ### 2.1 先约束环境，再让 AI 写代码
 
-**症状：** Typst 简历优化项目里 UI 组件直接调 API，每个组件各写一遍 `fetch`。Store 把防抖、网络请求、状态管理混在一个函数里。
+**症状：** 没有 Harness 时 Agent 写出什么代码？这是 Typst 简历优化项目的真实产出：
 
-**原因：** 没有人定义边界。Agent 选了最省事的架构——把所有东西塞在一起。
+```tsx
+// UI 组件直接发请求，每个组件各写一遍 fetch
+const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ messages, resumeData, apiKey }) });
+
+// 一个函数同时做防抖、网络请求、状态管理
+const compile = useCallback((d: ResumeData) => {
+  if (compileTimer.current) clearTimeout(compileTimer.current);
+  compileTimer.current = setTimeout(async () => {
+    dispatch({ type: "COMPILE_START" });
+    const res = await fetch("/api/compile", { ... });
+    dispatch({ type: "COMPILE_SUCCESS", svg: await res.text() });
+  }, 700);
+}, []);
+```
+
+每一个问题都指向同一个根因：**没有人定义边界。** Agent 选了最省事的架构——把所有东西塞在一起。
 
 **修复：** 墨简在第一行业务代码之前就定义了六层架构，只允许向下依赖：
 
