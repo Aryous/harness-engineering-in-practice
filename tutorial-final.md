@@ -354,31 +354,7 @@ Agent 选了隐喻（"灯塔"代表方向），但没展开为视觉规格——
 
 **规模放大暴露新的系统性问题。Harness 是一个持续演进的系统。**
 
-**配图系统的 Harness 工件：**
-
-**plan.lock.yaml（参数契约）：**
-
-```yaml
-# 上游 orchestrator 锁定，下游 creative/render 不可覆写
-density: standard
-style_guide: digital-rationalism
-negative_prompt: "no neon, no cyberpunk, no heavy texture..."
-generation:
-  model: gemini-3-pro-image-preview
-  aspect_ratio: "16:9"
-  image_size: "2K"
-```
-
-**pipeline-gates.md（质量门禁）：**
-
-```
-Gate 0 → plan.lock.yaml 存在且值域合法      → 才允许进入 creative
-Gate A → creative-draft.md 非空              → 才允许进入 compiler
-Gate B → 每个 NN-*.md 有非空 English Prompt  → 才允许 render
-Review → review-feedback.yaml 存在           → 打回 creative 重写
-```
-
-Gate 的设计原则是**成功静默，失败出声**。验证通过不输出任何信息，只有失败时才注入 Agent 上下文。
+配图系统的完整 Harness 工件（plan.lock.yaml 参数契约、pipeline-gates.md 门禁定义）见 [LayerAxis 仓库](https://github.com/Aryous/layeraxis-marketplace)。
 
 **模板：**
 1. 最小约束启动，不要过度设计
