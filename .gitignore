@@ -5,6 +5,8 @@ PLAN.md
 .claude/
 examples/
 references/
+drafts/
+docs/
 
 # macOS
 .DS_Store
