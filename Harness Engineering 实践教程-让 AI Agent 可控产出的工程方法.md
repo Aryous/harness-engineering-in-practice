@@ -4,7 +4,6 @@
 
 **相关仓库：**
 - [墨简 Mojian](https://github.com/Aryous/Mojian) — Harness 实验组
-- [Typst 简历编辑器](https://github.com/Aryous/typst-resume) — 无 Harness 对照组
 - [LayerAxis 配图系统](https://github.com/Aryous/layeraxis-marketplace) — 迭代案例
 - [HarnessPractice](https://github.com/Aryous/HarnessPractice) — 从墨简抽象的可复用框架
 
@@ -428,7 +427,6 @@ Agent 选了隐喻（"灯塔"代表方向），但没展开为视觉规格——
 ## 项目仓库
 
 - [墨简 Mojian](https://github.com/Aryous/Mojian)（Harness 实验组）
-- [Typst 简历编辑器](https://github.com/Aryous/typst-resume)（无 Harness 对照组）
 - [LayerAxis 配图系统](https://github.com/Aryous/layeraxis-marketplace)（迭代案例）
-- [HarnessPractice](https://github.com/Aryous/HarnessPractice)（可复用框架，44 文件 ~4000 行）
+- [HarnessPractice](https://github.com/Aryous/HarnessPractice)（可复用框架）
 - [本文及写作素材](https://github.com/Aryous/harness-engineering-in-practice)
