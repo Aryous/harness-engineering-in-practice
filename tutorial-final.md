@@ -299,9 +299,19 @@ requirements.trace.yaml      ← 结构化注册表（给脚本读）
 
 `--strict` 模式下，有未覆盖的条目就 exit 1——提交被阻断。`--sync` 模式下，有代码覆盖的 `open` 状态自动回写为 `resolved`。
 
-**harness-doctor.sh——会话健康检查：**
+**STATE.yaml——实时控制面：**
 
-每次新会话启动时运行，扫描：文档 frontmatter 一致性、sidecar 同步状态、豁免是否过期、worktree 是否干净。输出 STATE.yaml。Agent 不靠记忆判断系统状态——脚本告诉它。
+```yaml
+docs:
+  intent.md: approved
+  requirements.md: approved
+trace:
+  coverage: 85%
+  missing: [F06, F07, F08]
+recommended_next: feature agent
+```
+
+Agent 每次启动先读 STATE.yaml，知道系统当前在什么阶段、该做什么。不靠记忆，靠状态。STATE.yaml 由 `harness-doctor.sh` 在每次会话启动时自动生成——扫描文档 frontmatter、sidecar 同步状态、豁免过期情况，输出状态快照。
 
 **模板：**
 1. 叙事文档给人看，结构化 sidecar 给脚本读——两者解耦
