@@ -48,39 +48,6 @@ Harness 是 Agent 的运行环境——CLAUDE.md、自定义 lint、结构测试
 
 **为什么这个对比成立：** 同一个模型消除了能力变量。同一个领域消除了复杂度变量。同一套工具消除了平台变量。剩下的唯一解释就是 Harness。
 
-没有 Harness 时 Agent 写出什么代码？这是 Typst 简历优化项目的真实产出：
-
-```tsx
-// Typst: web/src/components/AiInputBar.tsx — UI 组件直接发请求
-const res = await fetch("/api/chat", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ messages, resumeData, apiKey }),
-});
-```
-
-```tsx
-// Typst: web/src/store/resume-store.tsx — 一个函数同时做防抖、网络请求、状态管理
-const compile = useCallback((d: ResumeData) => {
-  if (compileTimer.current) clearTimeout(compileTimer.current);  // 防抖
-  compileTimer.current = setTimeout(async () => {
-    dispatch({ type: "COMPILE_START" });                          // 状态
-    const res = await fetch("/api/compile", { ... });             // 网络
-    dispatch({ type: "COMPILE_SUCCESS", svg: await res.text() }); // 状态
-  }, 700);
-}, []);
-```
-
-```tsx
-// Typst: web/src/store/resume-store.tsx — 双重类型强转
-data: setNestedField(
-  state.data as unknown as Record<string, unknown>,
-  action.path, action.value
-) as unknown as ResumeData,
-```
-
-每一个问题都指向同一个根因：**没有人给 Agent 画过边界。**
-
 ---
 
 ## 2. 怎么搭 Harness
