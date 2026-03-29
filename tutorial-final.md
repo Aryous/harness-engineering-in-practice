@@ -136,25 +136,10 @@ Agent 不猜——按图索骥。详细内容在 `docs/` 目录下 20+ 文件中
 
 墨简还有一个设计决策：**CLAUDE.md 是操作系统，`project.md` 是应用。** 框架通用部分在 CLAUDE.md，项目特有身份在 `.claude/project.md`。换项目只改一个文件。这个设计后来被抽象为独立框架 [HarnessPractice](https://github.com/Aryous/HarnessPractice)。
 
-**STATE.yaml 实时控制面：**
-
-```yaml
-docs:
-  intent.md: approved
-  requirements.md: approved
-trace:
-  coverage: 85%
-  missing: [F06, F07, F08]
-recommended_next: feature agent
-```
-
-Agent 每次启动先读 STATE.yaml，知道系统当前在什么阶段、该做什么。不靠记忆，靠状态。
-
 **模板：**
 1. CLAUDE.md 只放路径和导航，不超过 ~140 行
 2. 用伪代码定义路由，不用自然语言描述
 3. 详细内容放 `docs/`，按类型分文件夹
-4. 用 STATE.yaml 做实时控制面——Agent 按状态路由，不按记忆路由
 
 ### 2.3 约束必须能执行
 
