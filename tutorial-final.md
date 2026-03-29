@@ -2,34 +2,6 @@
 
 > 同一个模型，同一个领域，同一套工具。两个项目写出了两种代码质量。唯一的变量是 Harness。
 
-**相关仓库：**
-- [墨简 Mojian](https://github.com/Aryous/Mojian) — Harness 实验组
-- [Typst 简历编辑器](https://github.com/Aryous/typst-resume) — 无 Harness 对照组
-- [LayerAxis 配图系统](https://github.com/Aryous/layeraxis-marketplace) — 迭代案例
-- [HarnessPractice](https://github.com/Aryous/HarnessPractice) — 从墨简抽象的可复用框架
-
----
-
-**目录**
-
-**[1. 什么是 Harness Engineering](#1-什么是-harness-engineering)** — 定义、对比结果、实验设计
-- [1.1 定义与背景](#11-定义与背景) — 三家定义 + 一个公式
-- [1.2 先看结果](#12-先看结果) — 同一个模型、同一个领域，两种代码质量
-- [1.3 实验设计](#13-实验设计) — 控制变量与真实代码
-
-**[2. 怎么搭 Harness](#2-怎么搭-harness)** — 六个维度 × 真实代码
-- [2.1 先约束环境，再让 AI 写代码](#21-先约束环境再让-ai-写代码) — 六层架构 + ESLint 锁死依赖
-- [2.2 知识写成地图，不写成百科](#22-知识写成地图不写成百科) — CLAUDE.md 对比 + STATE.yaml 控制面
-- [2.3 约束必须能执行](#23-约束必须能执行) — 三层约束 + 升级路径 + 豁免状态机
-- [2.4 上下文冲突了才拆 Agent](#24-上下文冲突了才拆-agent) — 7 Agent + 7 协议 + 有损传递陷阱
-- [2.5 让机器做追踪](#25-让机器做追踪) — trace.sh + sidecar YAML + harness-doctor
-- [2.6 Harness 是被失败逼出来的](#26-harness-是被失败逼出来的) — 配图系统 33% → 100% 迭代链
-
-**[3. 怎么开始](#3-怎么开始)** — Checklist、成本、结语
-- [3.1 最小 Harness](#31-最小-harness) — 5 项 Checklist
-- [3.2 成本与局限](#32-成本与局限) — 冷启动、文档腐烂、链路损耗
-- [3.3 结语](#33-结语) — 先升级 Harness，再升级模型
-
 ---
 
 ## 1. 什么是 Harness Engineering
