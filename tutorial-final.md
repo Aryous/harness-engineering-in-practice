@@ -134,7 +134,7 @@ on_user_message(msg):
 
 Agent 不猜——按图索骥。详细内容在 `docs/` 目录下 20+ 文件中，按需加载。
 
-墨简还有一个设计决策：**CLAUDE.md 是操作系统，`project.md` 是应用。** 框架通用部分在 CLAUDE.md，项目特有身份在 `.claude/project.md`。换项目只改一个文件。这个设计后来被抽象为独立框架 [HarnessPractice](https://github.com/Aryous/HarnessPractice)。
+墨简还有一个设计决策：**CLAUDE.md 是操作系统，`project.md` 是应用。** 框架通用部分在 CLAUDE.md，项目特有身份在 `.claude/project.md`。换项目只改一个文件。这个模式可以直接复用——[HarnessPractice](https://github.com/Aryous/HarnessPractice) 是从墨简抽象出的可复用框架。
 
 **模板：**
 1. CLAUDE.md 只放路径和导航，不超过 ~140 行
