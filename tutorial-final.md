@@ -291,7 +291,7 @@ Agent 每次启动先读 STATE.yaml，知道系统当前在什么阶段、该做
 
 ### 2.6 Harness 是被失败逼出来的
 
-前面五节讲的是墨简的 Harness 结构。但 Harness Engineering 更核心的部分不是结构——是迭代方法。
+Harness Engineering 更核心的部分不是结构——是迭代方法。
 
 配图系统 [LayerAxis](https://github.com/Aryous/layeraxis-marketplace) 完整经历了这个过程。它是一个 3-Agent 流水线，为文章的每个章节设计和生成配图：
 
